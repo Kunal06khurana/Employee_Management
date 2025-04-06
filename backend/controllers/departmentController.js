@@ -5,6 +5,8 @@ const departmentController = {
   getAllDepartments: async (req, res) => {
     try {
       console.log('Fetching all departments...');
+      console.log('Request headers:', req.headers);
+      
       const [departments] = await db.query(`
         SELECT d.*, 
                CONCAT(e.First_Name, ' ', e.Last_Name) as Manager_Name
@@ -13,24 +15,26 @@ const departmentController = {
         ORDER BY d.Department_ID
       `);
       
-      if (!departments || departments.length === 0) {
-        console.log('No departments found');
-        return res.json([]); // Return empty array instead of error
+      if (!departments) {
+        console.log('No departments found in database');
+        return res.json([]);
       }
       
       console.log('Departments fetched successfully:', departments);
       res.json(departments);
     } catch (error) {
-      console.error('Error fetching departments:', error);
+      console.error('Error in getAllDepartments:', error);
       if (error.code === 'ER_NO_SUCH_TABLE') {
         return res.status(500).json({ 
           message: 'Department table does not exist. Please initialize the database.',
-          error: error.message 
+          error: error.message,
+          code: error.code
         });
       }
       res.status(500).json({ 
         message: 'Error fetching departments', 
-        error: error.message 
+        error: error.message,
+        code: error.code
       });
     }
   },

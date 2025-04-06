@@ -10,6 +10,7 @@ const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const departmentRoutes = require('./routes/departmentRoutes');
 
 // Middleware
 app.use(morgan('dev')); // Add logging
@@ -30,6 +31,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
 app.use('/api/leave', leaveRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/departments', departmentRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

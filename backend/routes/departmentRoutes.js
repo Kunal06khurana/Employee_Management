@@ -3,24 +3,71 @@ const router = express.Router();
 const departmentController = require('../controllers/departmentController');
 const { verifyToken } = require('../middleware/auth');
 
-// Apply verifyToken middleware to all routes
-router.use(verifyToken);
-
-// Get all departments (accessible to all authenticated users)
-router.get('/', (req, res, next) => {
-  console.log('GET /api/departments route hit');
-  departmentController.getAllDepartments(req, res, next);
+// Debug middleware for this router
+router.use((req, res, next) => {
+  console.log('\n=== Department Route Debug ===');
+  console.log('Time:', new Date().toISOString());
+  console.log('Method:', req.method);
+  console.log('Path:', req.path);
+  console.log('Full URL:', req.originalUrl);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  console.log('===========================\n');
+  next();
 });
 
-// Get department by ID (accessible to all authenticated users)
-router.get('/:id', (req, res, next) => {
-  console.log(`GET /api/departments/${req.params.id} route hit`);
-  departmentController.getDepartmentById(req, res, next);
+// Get all departments
+router.get('/', verifyToken, async (req, res, next) => {
+  try {
+    console.log('\n=== GET /departments ===');
+    console.log('User:', req.user);
+    await departmentController.getAllDepartments(req, res);
+  } catch (error) {
+    console.error('Error in GET /departments:', error);
+    next(error);
+  }
 });
 
-// Admin-only routes
-router.post('/', verifyToken, departmentController.createDepartment);
-router.put('/:id', verifyToken, departmentController.updateDepartment);
-router.delete('/:id', verifyToken, departmentController.deleteDepartment);
+// Get department by ID
+router.get('/:id', verifyToken, async (req, res, next) => {
+  try {
+    console.log('\n=== GET /departments/:id ===');
+    console.log('ID:', req.params.id);
+    console.log('User:', req.user);
+    await departmentController.getDepartmentById(req, res);
+  } catch (error) {
+    console.error('Error in GET /departments/:id:', error);
+    next(error);
+  }
+});
+
+// Create department
+router.post('/', verifyToken, async (req, res, next) => {
+  try {
+    console.log('\n=== POST /departments ===');
+    await departmentController.createDepartment(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Update department
+router.put('/:id', verifyToken, async (req, res, next) => {
+  try {
+    console.log('\n=== PUT /departments/:id ===');
+    await departmentController.updateDepartment(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// Delete department
+router.delete('/:id', verifyToken, async (req, res, next) => {
+  try {
+    console.log('\n=== DELETE /departments/:id ===');
+    await departmentController.deleteDepartment(req, res);
+  } catch (error) {
+    next(error);
+  }
+});
 
 module.exports = router; 
