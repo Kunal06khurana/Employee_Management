@@ -1,0 +1,23 @@
+{
+  "name": "employee-management-backend",
+  "version": "1.0.0",
+  "description": "Backend for Employee Salary Management System",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "init-db": "mysql -u root < models/schema.sql && mysql -u root EmployeeSalaryManagement < models/seed.sql"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "mysql2": "^3.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  }
+}

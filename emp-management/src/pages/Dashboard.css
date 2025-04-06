@@ -1,0 +1,165 @@
+.dashboard {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.error-message {
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  border: 1px solid #ffcdd2;
+}
+
+.section {
+  margin-bottom: 30px;
+}
+
+.section h2 {
+  margin-bottom: 20px;
+  color: #333;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 10px;
+}
+
+/* Summary Card */
+.summary-card {
+  margin-bottom: 30px;
+}
+
+.card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.card h3 {
+  margin: 0;
+  color: #666;
+}
+
+.card .number {
+  font-size: 2em;
+  font-weight: bold;
+  color: #2196f3;
+  margin: 10px 0 0;
+}
+
+/* Leave Requests */
+.leave-requests {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.leave-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.leave-info h4 {
+  margin: 0 0 5px;
+  color: #333;
+}
+
+.leave-info p {
+  margin: 0;
+  color: #666;
+}
+
+.leave-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn.approve {
+  background-color: #4caf50;
+  color: white;
+}
+
+.btn.approve:hover {
+  background-color: #45a049;
+}
+
+.btn.reject {
+  background-color: #f44336;
+  color: white;
+}
+
+.btn.reject:hover {
+  background-color: #da190b;
+}
+
+/* Activity Feed */
+.activity-feed {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.activity-card {
+  background: white;
+  padding: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.activity-card p {
+  margin: 0 0 5px;
+  color: #333;
+}
+
+.activity-card small {
+  color: #666;
+}
+
+/* Department Statistics */
+.department-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.department-card {
+  background: white;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.department-card h3 {
+  margin: 0 0 10px;
+  color: #333;
+}
+
+.department-card p {
+  margin: 5px 0;
+  color: #666;
+}
+
+/* No Data Message */
+.no-data {
+  text-align: center;
+  color: #666;
+  padding: 20px;
+  background: #f5f5f5;
+  border-radius: 8px;
+} 

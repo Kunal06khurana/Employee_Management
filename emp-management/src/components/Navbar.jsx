@@ -1,91 +1,93 @@
 import React, { useState } from 'react';
-import { NavLink } from 'react-router-dom';
-import { Menu, X, User, DollarSign, FileText, Home, LogIn } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, LogOut } from 'lucide-react';
 
 const Navbar = () => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-  const toggleMenu = () => {
-    setIsOpen(!isOpen);
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    navigate('/login');
   };
 
-  const navLinks = [
-    { name: 'Dashboard', path: '/', icon: <Home className="w-5 h-5" /> },
-    { name: 'Employees', path: '/employees', icon: <User className="w-5 h-5" /> },
-    { name: 'Salary Management', path: '/salary', icon: <DollarSign className="w-5 h-5" /> },
-    { name: 'Reports', path: '/reports', icon: <FileText className="w-5 h-5" /> },
-    { name: 'Login', path: '/login', icon: <LogIn className="w-5 h-5" /> },
+  const links = [
+    { name: 'Dashboard', href: '/' },
+    { name: 'Employees', href: '/employees' },
+    { name: 'Salary', href: '/salary' },
+    { name: 'Reports', href: '/reports' },
   ];
 
   return (
-    <nav className="bg-gradient-to-r from-purple-700 to-indigo-800 shadow-lg">
+    <nav className="bg-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <span className="text-white text-xl font-bold">EmpSalary</span>
+        <div className="flex justify-between h-16">
+          <div className="flex">
+            <div className="flex-shrink-0 flex items-center">
+              <h1 className="text-xl font-bold text-indigo-600">EMS Admin</h1>
             </div>
-            <div className="hidden md:block">
-              <div className="ml-10 flex items-baseline space-x-4">
-                {navLinks.map((link) => (
-                  <NavLink
-                    key={link.name}
-                    to={link.path}
-                    className={({ isActive }) =>
-                      isActive
-                        ? 'bg-indigo-900 text-white px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2'
-                        : 'text-gray-200 hover:bg-indigo-600 hover:text-white px-3 py-2 rounded-md text-sm font-medium flex items-center gap-2'
-                    }
-                  >
-                    {link.icon}
-                    {link.name}
-                  </NavLink>
-                ))}
-              </div>
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-8">
+              {links.map((link) => (
+                <Link
+                  key={link.name}
+                  to={link.href}
+                  className="inline-flex items-center px-1 pt-1 text-gray-500 hover:text-gray-900"
+                >
+                  {link.name}
+                </Link>
+              ))}
             </div>
           </div>
-          <div className="-mr-2 flex md:hidden">
+
+          <div className="hidden sm:ml-6 sm:flex sm:items-center">
+            <div className="ml-3 relative flex items-center space-x-4">
+              <span className="text-gray-700">Welcome, {user.username}</span>
+              <button
+                onClick={handleLogout}
+                className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </button>
+            </div>
+          </div>
+
+          <div className="-mr-2 flex items-center sm:hidden">
             <button
-              onClick={toggleMenu}
-              type="button"
-              className="bg-indigo-800 inline-flex items-center justify-center p-2 rounded-md text-gray-200 hover:text-white hover:bg-indigo-600 focus:outline-none"
-              aria-controls="mobile-menu"
-              aria-expanded="false"
+              onClick={() => setIsOpen(!isOpen)}
+              className="inline-flex items-center justify-center p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
             >
-              <span className="sr-only">Open main menu</span>
-              {isOpen ? (
-                <X className="block h-6 w-6" aria-hidden="true" />
-              ) : (
-                <Menu className="block h-6 w-6" aria-hidden="true" />
-              )}
+              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
             </button>
           </div>
         </div>
       </div>
 
       {/* Mobile menu */}
-      <div
-        className={`${isOpen ? 'block' : 'hidden'} md:hidden`}
-        id="mobile-menu"
-      >
-        <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
-          {navLinks.map((link) => (
-            <NavLink
-              key={link.name}
-              to={link.path}
-              className={({ isActive }) =>
-                isActive
-                  ? 'bg-indigo-900 text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2'
-                  : 'text-gray-200 hover:bg-indigo-600 hover:text-white block px-3 py-2 rounded-md text-base font-medium flex items-center gap-2'
-              }
-              onClick={() => setIsOpen(false)}
+      {isOpen && (
+        <div className="sm:hidden">
+          <div className="pt-2 pb-3 space-y-1">
+            {links.map((link) => (
+              <Link
+                key={link.name}
+                to={link.href}
+                className="block pl-3 pr-4 py-2 text-base font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-50"
+                onClick={() => setIsOpen(false)}
+              >
+                {link.name}
+              </Link>
+            ))}
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left pl-3 pr-4 py-2 text-base font-medium text-red-600 hover:text-red-800 hover:bg-gray-50"
             >
-              {link.icon}
-              {link.name}
-            </NavLink>
-          ))}
+              Logout
+            </button>
+          </div>
         </div>
-      </div>
+      )}
     </nav>
   );
 };
