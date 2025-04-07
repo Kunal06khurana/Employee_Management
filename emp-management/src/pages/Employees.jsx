@@ -27,11 +27,21 @@ const Employees = () => {
     IFSC_Code: "",
     Password: "",
     Performance_Rating: "",
+    Basic_Salary: "",
+    Leave_Balance: "",
   })
 
   const [employees, setEmployees] = useState([])
   const [departments, setDepartments] = useState([])
   const [viewEmployee, setViewEmployee] = useState(null)
+  const [dependents, setDependents] = useState([]);
+  const [dependentForm, setDependentForm] = useState({
+    Name: '',
+    Relationship: '',
+    DOB: '',
+    Gender: '',
+    Contact: ''
+  });
 
   useEffect(() => {
     fetchEmployees()
@@ -66,6 +76,18 @@ const Employees = () => {
     }
   }
 
+  const fetchDependents = async (employeeId) => {
+    try {
+      const token = localStorage.getItem('token');
+      const response = await axios.get(`http://localhost:5000/api/employees/${employeeId}/dependents`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setDependents(response.data);
+    } catch (error) {
+      console.error('Error fetching dependents:', error);
+    }
+  };
+
   const handleChange = (e) => {
     const { name, value } = e.target
     setFormData({
@@ -75,36 +97,59 @@ const Employees = () => {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+    e.preventDefault();
     try {
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('token');
+      const employeeData = {
+        ...formData,
+        Basic_Salary: parseFloat(formData.Basic_Salary) || 0,
+        Leave_Balance: parseInt(formData.Leave_Balance) || 20,
+        Performance_Rating: parseFloat(formData.Performance_Rating) || 0
+      };
+
       if (formData.Employee_ID) {
         // Update existing employee
         await axios.put(
           `http://localhost:5000/api/employees/${formData.Employee_ID}`,
-          formData,
+          employeeData,
           { headers: { Authorization: `Bearer ${token}` } }
-        )
+        );
       } else {
         // Add new employee
         await axios.post(
           'http://localhost:5000/api/employees',
-          formData,
+          employeeData,
           { headers: { Authorization: `Bearer ${token}` } }
-        )
+        );
       }
-      fetchEmployees()
-      resetForm()
+      fetchEmployees();
+      resetForm();
     } catch (error) {
-      console.error('Error saving employee:', error)
-      setError(error.response?.data?.message || 'Failed to save employee. Please try again.')
+      console.error('Error saving employee:', error);
+      setError(error.response?.data?.message || 'Failed to save employee. Please try again.');
     }
-  }
+  };
 
-  const handleEdit = (employee) => {
-    setFormData(employee)
-    setShowAddModal(true)
-  }
+  const handleView = async (employee) => {
+    setViewEmployee(employee);
+    await fetchDependents(employee.Employee_ID);
+  };
+
+  const handleEdit = async (employee) => {
+    // Format dates to YYYY-MM-DD for input fields
+    const formattedEmployee = {
+      ...employee,
+      Date_Joined: new Date(employee.Date_Joined).toISOString().split('T')[0],
+      DOB: new Date(employee.DOB).toISOString().split('T')[0],
+      Basic_Salary: employee.Basic_Salary || '',
+      Leave_Balance: employee.Leave_Balance || '',
+      Performance_Rating: employee.Performance_Rating || '',
+      Password: '' // Clear password field for security
+    };
+    await fetchDependents(employee.Employee_ID);
+    setFormData(formattedEmployee);
+    setShowAddModal(true);
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this employee?')) return
@@ -119,10 +164,6 @@ const Employees = () => {
       console.error('Error deleting employee:', error)
       setError(error.response?.data?.message || 'Failed to delete employee. Please try again.')
     }
-  }
-
-  const handleView = (employee) => {
-    setViewEmployee(employee)
   }
 
   const resetForm = () => {
@@ -140,10 +181,87 @@ const Employees = () => {
       IFSC_Code: "",
       Password: "",
       Performance_Rating: "",
+      Basic_Salary: "",
+      Leave_Balance: "",
     })
     setShowAddModal(false)
     setError(null)
   }
+
+  const handleDependentChange = (e) => {
+    const { name, value } = e.target;
+    setDependentForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    // Clear error when user starts typing
+    if (error) setError(null);
+  };
+
+  const handleAddDependent = async (employeeId) => {
+    try {
+      // Form validation
+      const formErrors = [];
+      if (!dependentForm.Name?.trim()) formErrors.push("Name is required");
+      if (!dependentForm.Relationship?.trim()) formErrors.push("Relationship is required");
+      if (!dependentForm.DOB) formErrors.push("Date of Birth is required");
+      if (!dependentForm.Gender) formErrors.push("Gender is required");
+      if (!dependentForm.Contact?.trim()) formErrors.push("Contact is required");
+
+      if (formErrors.length > 0) {
+        setError(formErrors.join(", "));
+        return;
+      }
+
+      const token = localStorage.getItem('token');
+      const formattedData = {
+        Employee_ID: employeeId,
+        Name: dependentForm.Name.trim(),
+        Relationship: dependentForm.Relationship.trim(),
+        DOB: new Date(dependentForm.DOB).toISOString().split('T')[0],
+        Gender: dependentForm.Gender,
+        Contact: dependentForm.Contact.trim()
+      };
+
+      const response = await axios.post(
+        `http://localhost:5000/api/employees/${employeeId}/dependents`,
+        formattedData,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data) {
+        // Clear form and error after successful submission
+        setDependentForm({
+          Name: '',
+          Relationship: '',
+          DOB: '',
+          Gender: '',
+          Contact: ''
+        });
+        setError(null);
+        
+        // Refresh dependents list
+        await fetchDependents(employeeId);
+      }
+    } catch (error) {
+      console.error('Error adding dependent:', error.response?.data || error);
+      setError(error.response?.data?.message || 'Failed to add dependent. Please try again.');
+    }
+  };
+
+  const handleDeleteDependent = async (employeeId, dependentId) => {
+    try {
+      const token = localStorage.getItem('token');
+      await axios.delete(
+        `http://localhost:5000/api/employees/${employeeId}/dependents/${dependentId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      await fetchDependents(employeeId);
+    } catch (error) {
+      console.error('Error deleting dependent:', error);
+      setError(error.response?.data?.message || 'Failed to delete dependent. Please try again.');
+    }
+  };
 
   const filteredEmployees = employees.filter((employee) => {
     const searchLower = searchTerm.toLowerCase()
@@ -271,7 +389,7 @@ const Employees = () => {
       {/* Add/Edit Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full">
+          <div className="bg-white rounded-lg p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">
               {formData.Employee_ID ? "Edit Employee" : "Add New Employee"}
             </h2>
@@ -405,6 +523,28 @@ const Employees = () => {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700">Basic Salary</label>
+                  <input
+                    type="number"
+                    name="Basic_Salary"
+                    value={formData.Basic_Salary}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Leave Balance</label>
+                  <input
+                    type="number"
+                    name="Leave_Balance"
+                    value={formData.Leave_Balance}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700">Performance Rating</label>
                   <input
                     type="number"
@@ -415,9 +555,138 @@ const Employees = () => {
                     max="5"
                     step="0.1"
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                    required
                   />
                 </div>
               </div>
+
+              {/* Dependents Section in Edit Form */}
+              {formData.Employee_ID && (
+                <div className="mt-8">
+                  <h3 className="text-lg font-semibold mb-4">Dependents</h3>
+                  {error && (
+                    <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                      {error}
+                    </div>
+                  )}
+                  <div className="space-y-4">
+                    {dependents.map(dependent => (
+                      <div key={dependent.Dependent_ID} className="bg-gray-50 p-4 rounded-md">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="font-medium">{dependent.Name}</p>
+                            <p className="text-sm text-gray-500">{dependent.Relationship}</p>
+                            <p className="text-sm text-gray-500">DOB: {new Date(dependent.DOB).toLocaleDateString()}</p>
+                            <p className="text-sm text-gray-500">Gender: {dependent.Gender}</p>
+                            <p className="text-sm text-gray-500">Contact: {dependent.Contact}</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDependent(formData.Employee_ID, dependent.Dependent_ID)}
+                            className="text-red-600 hover:text-red-800"
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Add Dependent Form */}
+                  <div className="mt-6 bg-gray-50 p-4 rounded-md">
+                    <h4 className="text-md font-medium mb-4">Add New Dependent</h4>
+                    {error && (
+                      <div className="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                        {error}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Name*</label>
+                        <input
+                          type="text"
+                          name="Name"
+                          value={dependentForm.Name || ''}
+                          onChange={handleDependentChange}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          required
+                          placeholder="Enter dependent's name"
+                          minLength={2}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Relationship*</label>
+                        <select
+                          name="Relationship"
+                          value={dependentForm.Relationship || ''}
+                          onChange={handleDependentChange}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          required
+                        >
+                          <option value="">Select Relationship</option>
+                          <option value="Spouse">Spouse</option>
+                          <option value="Child">Child</option>
+                          <option value="Parent">Parent</option>
+                          <option value="Sibling">Sibling</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Date of Birth*</label>
+                        <input
+                          type="date"
+                          name="DOB"
+                          value={dependentForm.DOB || ''}
+                          onChange={handleDependentChange}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          required
+                          max={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Gender*</label>
+                        <select
+                          name="Gender"
+                          value={dependentForm.Gender || ''}
+                          onChange={handleDependentChange}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          required
+                        >
+                          <option value="">Select Gender</option>
+                          <option value="M">Male</option>
+                          <option value="F">Female</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Contact*</label>
+                        <input
+                          type="tel"
+                          name="Contact"
+                          value={dependentForm.Contact || ''}
+                          onChange={handleDependentChange}
+                          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
+                          required
+                          placeholder="Enter contact number"
+                          pattern="[0-9]{10}"
+                          title="Please enter a valid 10-digit contact number"
+                        />
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <button
+                        type="button"
+                        onClick={() => handleAddDependent(formData.Employee_ID)}
+                        className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                        disabled={!dependentForm.Name || !dependentForm.Relationship || !dependentForm.DOB || !dependentForm.Gender || !dependentForm.Contact}
+                      >
+                        Add Dependent
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
@@ -441,7 +710,7 @@ const Employees = () => {
       {/* View Modal */}
       {viewEmployee && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center">
-          <div className="bg-white rounded-lg p-8 max-w-2xl w-full">
+          <div className="bg-white rounded-lg p-8 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Employee Details</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -475,21 +744,57 @@ const Employees = () => {
                 <p className="mt-1">{viewEmployee.Contact}</p>
               </div>
               <div>
+                <p className="text-sm font-medium text-gray-500">Address</p>
+                <p className="mt-1">{viewEmployee.Address || 'N/A'}</p>
+              </div>
+              <div>
                 <p className="text-sm font-medium text-gray-500">Bank Account</p>
-                <p className="mt-1">{viewEmployee.Bank_Account_Number}</p>
+                <p className="mt-1">{viewEmployee.Bank_Account_Number || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">IFSC Code</p>
-                <p className="mt-1">{viewEmployee.IFSC_Code}</p>
+                <p className="mt-1">{viewEmployee.IFSC_Code || 'N/A'}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Performance Rating</p>
                 <p className="mt-1">{viewEmployee.Performance_Rating || 'N/A'}</p>
               </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Basic Salary</p>
+                <p className="mt-1">${(parseFloat(viewEmployee.Basic_Salary) || 0).toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-500">Leave Balance</p>
+                <p className="mt-1">{viewEmployee.Leave_Balance || '20'}</p>
+              </div>
             </div>
+
+            {/* Dependents Section */}
+            <div className="mt-8">
+              <h3 className="text-lg font-semibold mb-4">Dependents</h3>
+              <div className="space-y-4">
+                {dependents.map(dependent => (
+                  <div key={dependent.Dependent_ID} className="bg-gray-50 p-4 rounded-md">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-medium">{dependent.Name}</p>
+                        <p className="text-sm text-gray-500">{dependent.Relationship}</p>
+                        <p className="text-sm text-gray-500">DOB: {new Date(dependent.DOB).toLocaleDateString()}</p>
+                        <p className="text-sm text-gray-500">Gender: {dependent.Gender}</p>
+                        <p className="text-sm text-gray-500">Contact: {dependent.Contact}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
             <div className="mt-6 flex justify-end">
               <button
-                onClick={() => setViewEmployee(null)}
+                onClick={() => {
+                  setViewEmployee(null);
+                  setDependents([]);
+                }}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200"
               >
                 Close

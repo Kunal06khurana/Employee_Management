@@ -22,12 +22,17 @@ const dependentController = {
   addDependent: async (req, res) => {
     try {
       const { employeeId } = req.params;
-      const { name, relationship, dob, gender, contact } = req.body;
+      const { Name, Relationship, DOB, Gender, Contact } = req.body;
+
+      // Validate required fields
+      if (!Name || !Relationship || !DOB || !Gender || !Contact) {
+        return res.status(400).json({ message: 'All fields are required' });
+      }
 
       const [result] = await pool.query(
         `INSERT INTO Dependent (Employee_ID, Name, Relationship, DOB, Gender, Contact)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [employeeId, name, relationship, dob, gender, contact]
+        [employeeId, Name, Relationship, DOB, Gender, Contact]
       );
 
       res.status(201).json({
@@ -36,7 +41,7 @@ const dependentController = {
       });
     } catch (error) {
       console.error('Error in addDependent:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   },
 

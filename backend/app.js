@@ -43,12 +43,14 @@ const authRoutes = require('./routes/authRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
+const payrollRoutes = require('./routes/payrollRoutes');
 
 console.log('Routes loaded:', {
   auth: !!authRoutes,
   leave: !!leaveRoutes,
   employees: !!employeeRoutes,
-  departments: !!departmentRoutes
+  departments: !!departmentRoutes,
+  payroll: !!payrollRoutes
 });
 
 // Mount routes with debugging
@@ -71,6 +73,11 @@ app.use('/api/leave', (req, res, next) => {
   console.log('Leave route accessed');
   next();
 }, leaveRoutes);
+
+app.use('/api/payroll', (req, res, next) => {
+  console.log('Payroll route accessed');
+  next();
+}, payrollRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

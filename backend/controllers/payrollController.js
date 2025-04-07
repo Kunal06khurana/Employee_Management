@@ -105,7 +105,7 @@ const payrollController = {
       );
 
       const basicSalary = employee.Basic_Salary || 0;
-      const overtimeHours = overtimeResult[0].total_overtime || 0;
+      const overtime = overtimeResult[0].total_overtime || 0;
       const totalHours = overtimeResult[0].total_hours || 0;
       const approvedLeaves = leaveResult[0].approved_leaves || 0;
       const dependentCount = dependentResult[0].dependent_count || 0;
@@ -117,7 +117,9 @@ const payrollController = {
       const leaveDeductions = approvedLeaves * 1000; // 1000 per leave
       
       // Calculate insurance: 1000*(1 + dependents + 100*(hours - 8))
-      const insurance = 1000 * (1 + dependentCount + 100 * Math.max(0, totalHours - 8));
+      const insurance = 1000 * (1 + dependentCount);
+      const overtimeHours = 100 * (overtime);
+      
 
       // Calculate net salary
       const netSalary = (
