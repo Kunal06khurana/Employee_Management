@@ -1,42 +1,103 @@
-const db = require('../models/db');
+const pool = require('../config/database');
 
 const attendanceController = {
-  // Mark attendance for an employee
-  markAttendance: async (req, res) => {
+  // Get attendance for an employee
+  getAttendance: async (req, res) => {
     try {
-      const { date, status, hoursWorked, shiftDetails } = req.body;
-      const employeeId = req.user.id;
+      const { employeeId } = req.params;
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
 
-      // Check if attendance already marked for the date
-      const [[existing]] = await db.promise().query(
-        'SELECT * FROM Attendance WHERE Employee_ID = ? AND Date = ?',
-        [employeeId, date]
+      const [attendance] = await pool.query(
+        `SELECT * FROM Attendance 
+         WHERE Employee_ID = ? 
+         AND MONTH(Date) = ? 
+         AND YEAR(Date) = ?
+         ORDER BY Date DESC`,
+        [employeeId, currentMonth, currentYear]
       );
 
-      if (existing) {
-        return res.status(400).json({ message: 'Attendance already marked for this date' });
-      }
-
-      // Insert attendance record
-      await db.promise().query(
-        `INSERT INTO Attendance (Employee_ID, Date, Status, Hours_Worked, Shift_Details)
-         VALUES (?, ?, ?, ?, ?)`,
-        [employeeId, date, status, hoursWorked, shiftDetails]
-      );
-
-      // If overtime hours, update payroll
-      if (hoursWorked > 8) {
-        const overtimeHours = hoursWorked - 8;
-        await db.promise().query(
-          `UPDATE Payroll SET Overtime_Hours = Overtime_Hours + ?
-           WHERE Employee_ID = ?`,
-          [overtimeHours, employeeId]
-        );
-      }
-
-      res.status(201).json({ message: 'Attendance marked successfully' });
+      res.json(attendance);
     } catch (error) {
-      res.status(500).json({ message: 'Server error', error: error.message });
+      console.error('Error in getAttendance:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  },
+
+  // Get overtime hours for an employee
+  getOvertimeHours: async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const [overtimeResult] = await pool.query(
+        `SELECT 
+           SUM(GREATEST(Hours_Worked - 8, 0)) as total_overtime,
+           COUNT(*) as total_days,
+           SUM(Hours_Worked) as total_hours
+         FROM Attendance 
+         WHERE Employee_ID = ? 
+         AND MONTH(Date) = ? 
+         AND YEAR(Date) = ?`,
+        [employeeId, currentMonth, currentYear]
+      );
+
+      res.json({
+        overtimeHours: overtimeResult[0].total_overtime || 0,
+        totalDays: overtimeResult[0].total_days || 0,
+        totalHours: overtimeResult[0].total_hours || 0
+      });
+    } catch (error) {
+      console.error('Error in getOvertimeHours:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  },
+
+  // Add attendance record
+  addAttendance: async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      const { date, hoursWorked, status, shiftDetails } = req.body;
+
+      const [result] = await pool.query(
+        `INSERT INTO Attendance (
+          Employee_ID, Date, Hours_Worked, Status, Shift_Details
+        ) VALUES (?, ?, ?, ?, ?)`,
+        [employeeId, date, hoursWorked, status, shiftDetails]
+      );
+
+      res.status(201).json({
+        message: 'Attendance record added successfully',
+        attendanceId: result.insertId
+      });
+    } catch (error) {
+      console.error('Error in addAttendance:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  },
+
+  // Update attendance record
+  updateAttendance: async (req, res) => {
+    try {
+      const { employeeId, attendanceId } = req.params;
+      const { hoursWorked, status, shiftDetails } = req.body;
+
+      const [result] = await pool.query(
+        `UPDATE Attendance 
+         SET Hours_Worked = ?, Status = ?, Shift_Details = ?
+         WHERE Attendance_ID = ? AND Employee_ID = ?`,
+        [hoursWorked, status, shiftDetails, attendanceId, employeeId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Attendance record not found' });
+      }
+
+      res.json({ message: 'Attendance record updated successfully' });
+    } catch (error) {
+      console.error('Error in updateAttendance:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   },
 
@@ -67,7 +128,7 @@ const attendanceController = {
 
       query += ' ORDER BY a.Date DESC';
 
-      const [attendance] = await db.promise().query(query, params);
+      const [attendance] = await pool.query(query, params);
       res.json(attendance);
     } catch (error) {
       res.status(500).json({ message: 'Server error', error: error.message });
@@ -80,7 +141,7 @@ const attendanceController = {
       const { date } = req.query;
       const departmentId = req.user.departmentId;
 
-      const [attendance] = await db.promise().query(
+      const [attendance] = await pool.query(
         `SELECT a.*, e.First_Name, e.Last_Name
          FROM Attendance a
          JOIN Employee e ON e.Employee_ID = a.Employee_ID
@@ -95,33 +156,12 @@ const attendanceController = {
     }
   },
 
-  // Update attendance (admin only)
-  updateAttendance: async (req, res) => {
-    try {
-      const { attendanceId } = req.params;
-      const { status, hoursWorked, shiftDetails } = req.body;
-
-      await db.promise().query(
-        `UPDATE Attendance SET
-         Status = ?,
-         Hours_Worked = ?,
-         Shift_Details = ?
-         WHERE Attendance_ID = ?`,
-        [status, hoursWorked, shiftDetails, attendanceId]
-      );
-
-      res.json({ message: 'Attendance updated successfully' });
-    } catch (error) {
-      res.status(500).json({ message: 'Server error', error: error.message });
-    }
-  },
-
   // Get attendance summary (admin only)
   getAttendanceSummary: async (req, res) => {
     try {
       const { month, year } = req.query;
 
-      const [summary] = await db.promise().query(
+      const [summary] = await pool.query(
         `SELECT e.Employee_ID, e.First_Name, e.Last_Name,
                 COUNT(CASE WHEN a.Status = 'Present' THEN 1 END) as present_days,
                 COUNT(CASE WHEN a.Status = 'Absent' THEN 1 END) as absent_days,

@@ -1,19 +1,30 @@
 const express = require('express');
 const router = express.Router();
 const leaveController = require('../controllers/leaveController');
-const { auth, isAdmin } = require('../middleware/authMiddleware');
+const { verifyToken, isAdmin } = require('../middleware/auth');
 
-// Protected leave routes
-router.use(auth);
+// Apply authentication middleware to all routes
+router.use(verifyToken);
 
-// Admin routes
+// Get all leaves (admin only)
 router.get('/all', isAdmin, leaveController.getAllLeaves);
+
+// Get pending leaves (admin only)
 router.get('/pending', isAdmin, leaveController.getPendingLeaves);
 
-// Employee routes
-router.get('/employee/:employeeId', leaveController.getEmployeeLeaves);
-router.post('/apply', leaveController.applyLeave);
+// Get leaves for a specific employee
+router.get('/:employeeId', leaveController.getEmployeeLeaves);
+
+// Get leave count for salary calculation
+router.get('/:employeeId/count', leaveController.getLeaveCount);
+
+// Apply for leave
+router.post('/:employeeId', leaveController.addLeave);
+
+// Update leave status (admin only)
 router.put('/:leaveId/status', isAdmin, leaveController.updateLeaveStatus);
-router.delete('/:leaveId', leaveController.deleteLeave);
+
+// Delete leave
+router.delete('/:leaveId', isAdmin, leaveController.deleteLeave);
 
 module.exports = router; 

@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { Plus, Search, Edit, Trash2, Eye, Filter } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 import axios from "axios"
 
 const Employees = () => {
+  const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddModal, setShowAddModal] = useState(false)
   const [showFilterModal, setShowFilterModal] = useState(false)
@@ -176,7 +178,7 @@ const Employees = () => {
             Filters
           </button>
           <button
-            onClick={() => setShowAddModal(true)}
+            onClick={() => navigate('/employees/add')}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md flex items-center"
           >
             <Plus className="w-5 h-5 mr-2" />

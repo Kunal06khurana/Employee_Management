@@ -1,10 +1,10 @@
-const db = require('../models/db');
+const pool = require('../config/database');
 
 const leaveController = {
   // Get all leaves
   getAllLeaves: async (req, res) => {
     try {
-      const [leaves] = await db.query(`
+      const [leaves] = await pool.query(`
         SELECT l.*, e.First_Name, e.Last_Name, e.Email, e.Department_ID,
                d.Department_Name
         FROM \`Leave\` l
@@ -20,70 +20,100 @@ const leaveController = {
     }
   },
 
-  // Get leaves for a specific employee
+  // Get all leaves for an employee
   getEmployeeLeaves: async (req, res) => {
     try {
       const { employeeId } = req.params;
-      
-      const [leaves] = await db.query(`
-        SELECT l.*, e.First_Name, e.Last_Name
-        FROM \`Leave\` l
-        JOIN Employee e ON l.Employee_ID = e.Employee_ID
-        WHERE l.Employee_ID = ?
-        ORDER BY l.Start_Date DESC
-      `, [employeeId]);
-      
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const [leaves] = await pool.query(
+        `SELECT * FROM \`Leave\` 
+         WHERE Employee_ID = ? 
+         AND MONTH(Start_Date) = ? 
+         AND YEAR(Start_Date) = ?
+         ORDER BY Start_Date DESC`,
+        [employeeId, currentMonth, currentYear]
+      );
+
       res.json(leaves);
     } catch (error) {
-      console.error('Error fetching employee leaves:', error);
-      res.status(500).json({ message: 'Error fetching employee leaves', error: error.message });
+      console.error('Error in getEmployeeLeaves:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   },
 
-  // Apply for leave
-  applyLeave: async (req, res) => {
+  // Get leave count for salary deduction
+  getLeaveCount: async (req, res) => {
     try {
-      const { employeeId, leaveType, startDate, endDate } = req.body;
-      
-      const [result] = await db.query(`
-        INSERT INTO \`Leave\` (Employee_ID, Leave_Type, Start_Date, End_Date, Status)
-        VALUES (?, ?, ?, ?, 'Pending')
-      `, [employeeId, leaveType, startDate, endDate]);
-      
-      res.json({ message: 'Leave application submitted successfully', leaveId: result.insertId });
+      const { employeeId } = req.params;
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const [leaveCount] = await pool.query(
+        `SELECT COUNT(*) as total_leaves,
+         SUM(CASE WHEN Status = 'Approved' THEN 1 ELSE 0 END) as approved_leaves
+         FROM \`Leave\`
+         WHERE Employee_ID = ? 
+         AND MONTH(Start_Date) = ? 
+         AND YEAR(Start_Date) = ?`,
+        [employeeId, currentMonth, currentYear]
+      );
+
+      res.json({
+        totalLeaves: leaveCount[0].total_leaves || 0,
+        approvedLeaves: leaveCount[0].approved_leaves || 0
+      });
     } catch (error) {
-      console.error('Error applying for leave:', error);
-      res.status(500).json({ message: 'Error applying for leave', error: error.message });
+      console.error('Error in getLeaveCount:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   },
 
-  // Update leave status (approve/reject)
+  // Add new leave request
+  addLeave: async (req, res) => {
+    try {
+      const { employeeId } = req.params;
+      const { leaveType, startDate, endDate, status = 'Pending' } = req.body;
+
+      const [result] = await pool.query(
+        `INSERT INTO \`Leave\` (
+          Employee_ID, Leave_Type, Start_Date, End_Date, Status
+        ) VALUES (?, ?, ?, ?, ?)`,
+        [employeeId, leaveType, startDate, endDate, status]
+      );
+
+      res.status(201).json({
+        message: 'Leave request added successfully',
+        leaveId: result.insertId
+      });
+    } catch (error) {
+      console.error('Error in addLeave:', error);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  },
+
+  // Update leave status
   updateLeaveStatus: async (req, res) => {
     try {
-      const { leaveId } = req.params;
+      const { employeeId, leaveId } = req.params;
       const { status } = req.body;
-      
-      // Update leave status
-      await db.query(`
-        UPDATE \`Leave\`
-        SET Status = ?
-        WHERE Leave_ID = ?
-      `, [status, leaveId]);
-      
-      // If approved, update leave balance
-      if (status === 'Approved') {
-        await db.query(`
-          UPDATE Employee e
-          JOIN \`Leave\` l ON e.Employee_ID = l.Employee_ID
-          SET e.Leave_Balance = e.Leave_Balance - DATEDIFF(l.End_Date, l.Start_Date) - 1
-          WHERE l.Leave_ID = ?
-        `, [leaveId]);
+
+      const [result] = await pool.query(
+        `UPDATE \`Leave\` 
+         SET Status = ?
+         WHERE Leave_ID = ? AND Employee_ID = ?`,
+        [status, leaveId, employeeId]
+      );
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'Leave request not found' });
       }
-      
-      res.json({ message: `Leave ${status.toLowerCase()} successfully` });
+
+      res.json({ message: 'Leave status updated successfully' });
     } catch (error) {
-      console.error('Error updating leave status:', error);
-      res.status(500).json({ message: 'Error updating leave status', error: error.message });
+      console.error('Error in updateLeaveStatus:', error);
+      res.status(500).json({ message: 'Internal server error' });
     }
   },
 
@@ -92,7 +122,7 @@ const leaveController = {
     try {
       const { leaveId } = req.params;
       
-      await db.query('DELETE FROM \`Leave\` WHERE Leave_ID = ?', [leaveId]);
+      await pool.query('DELETE FROM \`Leave\` WHERE Leave_ID = ?', [leaveId]);
       
       res.json({ message: 'Leave application deleted successfully' });
     } catch (error) {
@@ -104,7 +134,7 @@ const leaveController = {
   // Get all pending leave requests (admin or manager)
   getPendingLeaves: async (req, res) => {
     try {
-      const [leaves] = await db.query(
+      const [leaves] = await pool.query(
         `SELECT l.*, 
           e.First_Name, 
           e.Last_Name, 

@@ -40,47 +40,101 @@ const employeeController = {
     }
   },
 
-  // Create new employee
+  // Create a new employee
   createEmployee: async (req, res) => {
     try {
       const {
         First_Name,
         Last_Name,
+        DOB,
+        Address,
+        Contact,
         Email,
         Job_Title,
         Department_ID,
         Date_Joined,
-        DOB,
-        Address,
-        Contact,
+        Performance_Rating,
         Bank_Account_Number,
         IFSC_Code,
         Password,
-        Performance_Rating
+        Basic_Salary,
+        dependents
       } = req.body;
 
-      // Hash password
-      const hashedPassword = await bcrypt.hash(Password, 10);
+      // Start transaction
+      await db.query('START TRANSACTION');
 
-      const [result] = await db.query(`
-        INSERT INTO Employee (
-          First_Name, Last_Name, Email, Job_Title, Department_ID,
-          Date_Joined, DOB, Address, Contact, Bank_Account_Number,
-          IFSC_Code, Password, Performance_Rating
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `, [
-        First_Name, Last_Name, Email, Job_Title, Department_ID,
-        Date_Joined, DOB, Address, Contact, Bank_Account_Number,
-        IFSC_Code, hashedPassword, Performance_Rating
-      ]);
+      try {
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(Password, 10);
 
-      res.status(201).json({
-        message: 'Employee created successfully',
-        employeeId: result.insertId
-      });
+        // Insert employee with all fields matching the schema
+        const [result] = await db.query(
+          `INSERT INTO Employee (
+            First_Name, Last_Name, DOB, Address, Contact,
+            Email, Job_Title, Department_ID, Date_Joined,
+            Performance_Rating, Bank_Account_Number, IFSC_Code,
+            Password, Leave_Balance, Basic_Salary
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            First_Name, Last_Name, DOB, Address || null, Contact || null,
+            Email, Job_Title, Department_ID, Date_Joined || new Date(),
+            Performance_Rating || null, Bank_Account_Number || null, IFSC_Code || null,
+            hashedPassword, 20, Basic_Salary || 0.00
+          ]
+        );
+
+        const employeeId = result.insertId;
+
+        // Insert dependents if provided
+        if (dependents && Array.isArray(dependents)) {
+          for (const dependent of dependents) {
+            await db.query(
+              `INSERT INTO Dependent (
+                Employee_ID, Name, Relationship, DOB, Gender, Contact
+              ) VALUES (?, ?, ?, ?, ?, ?)`,
+              [
+                employeeId,
+                dependent.Name,
+                dependent.Relationship,
+                dependent.DOB || null,
+                dependent.Gender || null,
+                dependent.Contact || null
+              ]
+            );
+          }
+        }
+
+        // Get number of dependents for insurance calculation
+        const [dependentCount] = await db.query(
+          `SELECT COUNT(*) as count FROM Dependent WHERE Employee_ID = ?`,
+          [employeeId]
+        );
+
+        // Calculate net salary (basic salary for now)
+        const netSalary = Basic_Salary;
+        const taxableIncome = Basic_Salary;
+
+        // Create initial payroll record
+        await db.query(
+          `INSERT INTO Payroll (
+            Employee_ID, Basic_Salary, Overtime_Hours, Bonus,
+            Net_Salary, Taxable_Income, Payment_Date
+          ) VALUES (?, ?, ?, ?, ?, ?, NOW())`,
+          [employeeId, Basic_Salary, 0, 0, netSalary, taxableIncome]
+        );
+
+        // Commit transaction
+        await db.query('COMMIT');
+        res.status(201).json({ message: 'Employee created successfully', employeeId });
+      } catch (error) {
+        // Rollback transaction if there's an error
+        await db.query('ROLLBACK');
+        throw error;
+      }
     } catch (error) {
-      console.error('Error creating employee:', error);
-      res.status(500).json({ message: 'Error creating employee', error: error.message });
+      console.error('Error in createEmployee:', error);
+      res.status(500).json({ message: 'Failed to create employee', error: error.message });
     }
   },
 

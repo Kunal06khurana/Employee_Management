@@ -1,8 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import Employees from './pages/Employees';
+import Dashboard from './pages/Dashboard';  
+import Employees from './pages/employees';
+import AddEmployee from './pages/AddEmployee';
 import Salary from './pages/Salary';
 import Reports from './pages/Reports';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -35,6 +36,18 @@ function App() {
                 <>
                   <Navbar />
                   <Employees />
+                </>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/employees/add"
+            element={
+              <ProtectedRoute>
+                <>
+                  <Navbar />
+                  <AddEmployee />
                 </>
               </ProtectedRoute>
             }

@@ -40,9 +40,9 @@ app.get('/api/test', (req, res) => {
 
 // Import routes
 const authRoutes = require('./routes/authRoutes');
-const leaveRoutes = require('./routes/leaveRoutes');
 const employeeRoutes = require('./routes/employeeRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
+const leaveRoutes = require('./routes/leaveRoutes');
 
 console.log('Routes loaded:', {
   auth: !!authRoutes,
@@ -57,11 +57,6 @@ app.use('/api/auth', (req, res, next) => {
   next();
 }, authRoutes);
 
-app.use('/api/leave', (req, res, next) => {
-  console.log('Leave route accessed');
-  next();
-}, leaveRoutes);
-
 app.use('/api/employees', (req, res, next) => {
   console.log('Employees route accessed');
   next();
@@ -71,6 +66,11 @@ app.use('/api/departments', (req, res, next) => {
   console.log('Departments route accessed');
   next();
 }, departmentRoutes);
+
+app.use('/api/leave', (req, res, next) => {
+  console.log('Leave route accessed');
+  next();
+}, leaveRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
