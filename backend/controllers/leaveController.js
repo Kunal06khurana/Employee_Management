@@ -24,22 +24,18 @@ const leaveController = {
   getEmployeeLeaves: async (req, res) => {
     try {
       const { employeeId } = req.params;
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
 
       const [leaves] = await pool.query(
         `SELECT * FROM \`Leave\` 
          WHERE Employee_ID = ? 
-         AND MONTH(Start_Date) = ? 
-         AND YEAR(Start_Date) = ?
          ORDER BY Start_Date DESC`,
-        [employeeId, currentMonth, currentYear]
+        [employeeId]
       );
 
       res.json(leaves);
     } catch (error) {
       console.error('Error in getEmployeeLeaves:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   },
 
@@ -47,26 +43,29 @@ const leaveController = {
   getLeaveCount: async (req, res) => {
     try {
       const { employeeId } = req.params;
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
 
+      // Get employee's leave balance
+      const [[employee]] = await pool.query(
+        `SELECT Leave_Balance FROM Employee WHERE Employee_ID = ?`,
+        [employeeId]
+      );
+
+      // Get approved leaves count
       const [leaveCount] = await pool.query(
-        `SELECT COUNT(*) as total_leaves,
-         SUM(CASE WHEN Status = 'Approved' THEN 1 ELSE 0 END) as approved_leaves
+        `SELECT COUNT(*) as approved_leaves
          FROM \`Leave\`
          WHERE Employee_ID = ? 
-         AND MONTH(Start_Date) = ? 
-         AND YEAR(Start_Date) = ?`,
-        [employeeId, currentMonth, currentYear]
+         AND Status = 'Approved'`,
+        [employeeId]
       );
 
       res.json({
-        totalLeaves: leaveCount[0].total_leaves || 0,
+        leaveBalance: employee.Leave_Balance || 0,
         approvedLeaves: leaveCount[0].approved_leaves || 0
       });
     } catch (error) {
       console.error('Error in getLeaveCount:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   },
 
@@ -74,22 +73,51 @@ const leaveController = {
   addLeave: async (req, res) => {
     try {
       const { employeeId } = req.params;
-      const { leaveType, startDate, endDate, status = 'Pending' } = req.body;
+      const { 
+        Leave_Type, 
+        Start_Date, 
+        End_Date, 
+        Status = 'Pending', 
+        Remarks 
+      } = req.body;
 
-      const [result] = await pool.query(
-        `INSERT INTO \`Leave\` (
-          Employee_ID, Leave_Type, Start_Date, End_Date, Status
-        ) VALUES (?, ?, ?, ?, ?)`,
-        [employeeId, leaveType, startDate, endDate, status]
-      );
+      // Start a transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
 
-      res.status(201).json({
-        message: 'Leave request added successfully',
-        leaveId: result.insertId
-      });
+      try {
+        // Get current leave balance
+        const [[employee]] = await connection.query(
+          `SELECT Leave_Balance FROM Employee WHERE Employee_ID = ?`,
+          [employeeId]
+        );
+
+        // Insert leave request
+        const [leaveResult] = await connection.query(
+          `INSERT INTO \`Leave\` (
+            Employee_ID, Leave_Type, Start_Date, End_Date, Status, Leave_Balance, Remarks
+          ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [employeeId, Leave_Type, Start_Date, End_Date, Status, employee.Leave_Balance, Remarks]
+        );
+
+        // Commit the transaction
+        await connection.commit();
+        
+        res.status(201).json({
+          message: 'Leave request added successfully',
+          leaveId: leaveResult.insertId
+        });
+      } catch (error) {
+        // Rollback in case of error
+        await connection.rollback();
+        throw error;
+      } finally {
+        // Release the connection
+        connection.release();
+      }
     } catch (error) {
       console.error('Error in addLeave:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   },
 
@@ -99,21 +127,68 @@ const leaveController = {
       const { employeeId, leaveId } = req.params;
       const { status } = req.body;
 
-      const [result] = await pool.query(
-        `UPDATE \`Leave\` 
-         SET Status = ?
-         WHERE Leave_ID = ? AND Employee_ID = ?`,
-        [status, leaveId, employeeId]
-      );
+      // Start a transaction
+      const connection = await pool.getConnection();
+      await connection.beginTransaction();
 
-      if (result.affectedRows === 0) {
-        return res.status(404).json({ message: 'Leave request not found' });
+      try {
+        // Get leave request details
+        const [[leaveRequest]] = await connection.query(
+          `SELECT * FROM \`Leave\` WHERE Leave_ID = ? AND Employee_ID = ?`,
+          [leaveId, employeeId]
+        );
+
+        if (!leaveRequest) {
+          await connection.rollback();
+          return res.status(404).json({ message: 'Leave request not found' });
+        }
+
+        // Get current leave balance
+        const [[employee]] = await connection.query(
+          `SELECT Leave_Balance FROM Employee WHERE Employee_ID = ?`,
+          [employeeId]
+        );
+
+        // Calculate leave duration
+        const startDate = new Date(leaveRequest.Start_Date);
+        const endDate = new Date(leaveRequest.End_Date);
+        const diffTime = Math.abs(endDate - startDate);
+        const leaveDuration = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; // +1 to include both start and end dates
+
+        // Update leave status
+        await connection.query(
+          `UPDATE \`Leave\` SET Status = ? WHERE Leave_ID = ? AND Employee_ID = ?`,
+          [status, leaveId, employeeId]
+        );
+
+        // If leave is approved, reduce the leave balance
+        if (status === 'Approved') {
+          const newBalance = employee.Leave_Balance - leaveDuration;
+          if (newBalance < 0) {
+            await connection.rollback();
+            return res.status(400).json({ message: 'Insufficient leave balance' });
+          }
+
+          await connection.query(
+            `UPDATE Employee SET Leave_Balance = ? WHERE Employee_ID = ?`,
+            [newBalance, employeeId]
+          );
+        }
+
+        // Commit the transaction
+        await connection.commit();
+        res.json({ message: 'Leave status updated successfully' });
+      } catch (error) {
+        // Rollback in case of error
+        await connection.rollback();
+        throw error;
+      } finally {
+        // Release the connection
+        connection.release();
       }
-
-      res.json({ message: 'Leave status updated successfully' });
     } catch (error) {
       console.error('Error in updateLeaveStatus:', error);
-      res.status(500).json({ message: 'Internal server error' });
+      res.status(500).json({ message: 'Internal server error', error: error.message });
     }
   },
 
@@ -139,6 +214,7 @@ const leaveController = {
           e.First_Name, 
           e.Last_Name, 
           e.Email,
+          e.Employee_ID,
           d.Department_Name
         FROM \`Leave\` l
         JOIN Employee e ON l.Employee_ID = e.Employee_ID

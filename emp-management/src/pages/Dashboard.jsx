@@ -58,11 +58,11 @@ const Dashboard = () => {
     return () => clearInterval(interval)
   }, [])
 
-  const handleLeaveAction = async (leaveId, action) => {
+  const handleLeaveAction = async (leaveId, action, employeeId) => {
     try {
       const token = localStorage.getItem("token")
       await axios.put(
-        `http://localhost:5000/api/leave/${leaveId}/status`,
+        `http://localhost:5000/api/employees/${employeeId}/leaves/${leaveId}`,
         { status: action === "approve" ? "Approved" : "Rejected" },
         { headers: { Authorization: `Bearer ${token}` } },
       )
@@ -275,14 +275,14 @@ const Dashboard = () => {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           className="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-colors"
-                          onClick={() => handleLeaveAction(leave.Leave_ID, "approve")}
+                          onClick={() => handleLeaveAction(leave.Leave_ID, "approve", leave.Employee_ID)}
                         >
                           <CheckCircle className="w-4 h-4 mr-1" />
                           Approve
                         </button>
                         <button
                           className="inline-flex items-center px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                          onClick={() => handleLeaveAction(leave.Leave_ID, "reject")}
+                          onClick={() => handleLeaveAction(leave.Leave_ID, "reject", leave.Employee_ID)}
                         >
                           <XCircle className="w-4 h-4 mr-1" />
                           Reject
