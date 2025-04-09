@@ -4,13 +4,24 @@ import { useState, useEffect } from "react"
 import axios from "axios"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
 import { Users, Calendar, Activity, Building2, CheckCircle, XCircle, RefreshCw, AlertCircle } from "lucide-react"
+import { useNavigate } from "react-router-dom"
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const [dashboardData, setDashboardData] = useState({
     totalEmployees: 0,
     pendingLeaves: [],
     recentActivity: [],
     departmentStats: [],
+    todayAttendance: {
+      attendance: [],
+      summary: {
+        present_count: 0,
+        absent_count: 0,
+        half_day_count: 0,
+        leave_count: 0
+      }
+    }
   })
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -24,27 +35,50 @@ const Dashboard = () => {
         setError("No authentication token found. Please login again.")
         setLoading(false)
         setRefreshing(false)
+        navigate('/login');
         return
       }
 
-      const headers = { Authorization: `Bearer ${token}` }
+      const headers = {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
 
+      // First try to fetch attendance data
+      let attendanceData = { attendance: [], summary: {} };
+      try {
+        const attendanceRes = await axios.get("http://localhost:5000/api/attendance/today", { headers });
+        attendanceData = attendanceRes.data;
+      } catch (error) {
+        console.error("Error fetching attendance:", error);
+        // Don't set error here, just continue with empty attendance data
+      }
+
+      // Then fetch other dashboard data
       const [summaryRes, leavesRes, activityRes] = await Promise.all([
         axios.get("http://localhost:5000/api/dashboard/summary", { headers }),
         axios.get("http://localhost:5000/api/leave/pending", { headers }),
-        axios.get("http://localhost:5000/api/dashboard/recent-activity", { headers }),
-      ])
+        axios.get("http://localhost:5000/api/dashboard/recent-activity", { headers })
+      ]);
 
       setDashboardData({
         totalEmployees: summaryRes.data.totalEmployees || 0,
         pendingLeaves: leavesRes.data || [],
         recentActivity: activityRes.data || [],
         departmentStats: summaryRes.data.departmentStats || [],
+        todayAttendance: attendanceData
       })
       setError(null)
     } catch (error) {
       console.error("Error fetching dashboard data:", error.response || error)
-      setError(error.response?.data?.message || "Error fetching dashboard data. Please try again.")
+      if (error.response?.status === 401) {
+        setError("Session expired. Please login again.")
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+      } else {
+        setError(error.response?.data?.message || "Error fetching dashboard data. Please try again.")
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -52,11 +86,16 @@ const Dashboard = () => {
   }
 
   useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate('/login');
+      return;
+    }
     fetchDashboardData()
     // Refresh dashboard data every 5 minutes
     const interval = setInterval(fetchDashboardData, 300000)
     return () => clearInterval(interval)
-  }, [])
+  }, [navigate])
 
   const handleLeaveAction = async (leaveId, action, employeeId) => {
     try {
@@ -232,6 +271,102 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Today's Attendance Section */}
+      <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <Calendar className="w-5 h-5 text-gray-600" />
+          Today's Attendance
+        </h2>
+
+        {/* Attendance Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-emerald-600">Present</p>
+                <p className="text-2xl font-bold text-emerald-700">{dashboardData.todayAttendance.summary.present_count || 0}</p>
+              </div>
+              <CheckCircle className="w-8 h-8 text-emerald-500" />
+            </div>
+          </div>
+
+          <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-red-600">Absent</p>
+                <p className="text-2xl font-bold text-red-700">{dashboardData.todayAttendance.summary.absent_count || 0}</p>
+              </div>
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+          </div>
+
+          <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-amber-600">Half Day</p>
+                <p className="text-2xl font-bold text-amber-700">{dashboardData.todayAttendance.summary.half_day_count || 0}</p>
+              </div>
+              <Activity className="w-8 h-8 text-amber-500" />
+            </div>
+          </div>
+
+          <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-blue-600">On Leave</p>
+                <p className="text-2xl font-bold text-blue-700">{dashboardData.todayAttendance.summary.leave_count || 0}</p>
+              </div>
+              <Calendar className="w-8 h-8 text-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        {/* Attendance Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-200">
+                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Employee</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Status</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Hours</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Shift</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dashboardData.todayAttendance.attendance.map((record) => (
+                <tr key={record.Attendance_ID} className="border-b border-gray-100">
+                  <td className="py-3 px-4">
+                    <div className="flex items-center">
+                      <span className="font-medium text-gray-900">
+                        {record.First_Name} {record.Last_Name}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="py-3 px-4">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                      ${record.Status === 'Present' ? 'bg-emerald-100 text-emerald-800' : 
+                        record.Status === 'Absent' ? 'bg-red-100 text-red-800' :
+                        record.Status === 'Half-Day' ? 'bg-amber-100 text-amber-800' :
+                        'bg-blue-100 text-blue-800'}`}>
+                      {record.Status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-gray-600">{record.Hours_Worked || 0} hrs</td>
+                  <td className="py-3 px-4 text-gray-600">{record.Shift_Details || '-'}</td>
+                </tr>
+              ))}
+              {dashboardData.todayAttendance.attendance.length === 0 && (
+                <tr>
+                  <td colSpan="4" className="py-8 text-center text-gray-500">
+                    No attendance records for today
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Pending Leave Requests */}
       <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
@@ -251,40 +386,31 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {dashboardData.pendingLeaves.map((leave, index) => (
-                  <tr
-                    key={leave.Leave_ID}
-                    className={`${index !== dashboardData.pendingLeaves.length - 1 ? "border-b border-gray-100" : ""} hover:bg-gray-50 transition-colors`}
-                  >
-                    <td className="py-4 px-4">
-                      <div className="font-medium text-gray-800">
-                        {leave.First_Name} {leave.Last_Name}
+                {dashboardData.pendingLeaves.map((leave) => (
+                  <tr key={leave.Leave_ID} className="border-b border-gray-100">
+                    <td className="py-3 px-4">
+                      <div className="flex items-center">
+                        <span className="font-medium text-gray-900">
+                          {leave.First_Name} {leave.Last_Name}
+                        </span>
                       </div>
                     </td>
-                    <td className="py-4 px-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRandomTextColor(index)} bg-opacity-10 ${getRandomTextColor(index).replace("text-", "bg-")}`}
-                      >
-                        {leave.Leave_Type}
-                      </span>
-                    </td>
-                    <td className="py-4 px-4 text-gray-600">
+                    <td className="py-3 px-4 text-gray-600">{leave.Leave_Type}</td>
+                    <td className="py-3 px-4 text-gray-600">
                       {formatDate(leave.Start_Date)} - {formatDate(leave.End_Date)}
                     </td>
-                    <td className="py-4 px-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                    <td className="py-3 px-4 text-right">
+                      <div className="flex justify-end gap-2">
                         <button
-                          className="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-colors"
-                          onClick={() => handleLeaveAction(leave.Leave_ID, "approve", leave.Employee_ID)}
+                          onClick={() => handleLeaveAction(leave.Leave_ID, 'approve', leave.Employee_ID)}
+                          className="px-3 py-1 text-sm font-medium text-emerald-600 hover:text-emerald-700"
                         >
-                          <CheckCircle className="w-4 h-4 mr-1" />
                           Approve
                         </button>
                         <button
-                          className="inline-flex items-center px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-sm font-medium hover:bg-red-100 transition-colors"
-                          onClick={() => handleLeaveAction(leave.Leave_ID, "reject", leave.Employee_ID)}
+                          onClick={() => handleLeaveAction(leave.Leave_ID, 'reject', leave.Employee_ID)}
+                          className="px-3 py-1 text-sm font-medium text-red-600 hover:text-red-700"
                         >
-                          <XCircle className="w-4 h-4 mr-1" />
                           Reject
                         </button>
                       </div>
@@ -294,9 +420,7 @@ const Dashboard = () => {
               </tbody>
             </table>
           ) : (
-            <div className="flex items-center justify-center h-40 bg-gray-50 rounded-lg">
-              <p className="text-gray-500">No pending leave requests</p>
-            </div>
+            <div className="text-center py-8 text-gray-500">No pending leave requests</div>
           )}
         </div>
       </div>
@@ -320,8 +444,8 @@ const Dashboard = () => {
         ))}
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Dashboard
+export default Dashboard;
 

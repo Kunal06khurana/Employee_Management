@@ -107,9 +107,13 @@ const attendanceController = {
       const { id } = req.params;
       const { month, year } = req.query;
 
+      console.log('Getting attendance for employee:', id);
+      console.log('User requesting:', req.user);
+
       // Check permissions
       if (!req.user.isAdmin && req.user.id !== parseInt(id) &&
-          (!req.user.isManager || req.user.departmentId !== req.user.departmentId)) {
+          (!req.user.isManager || req.user.departmentId !== parseInt(id))) {
+        console.log('Access denied for user:', req.user.id);
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -128,9 +132,15 @@ const attendanceController = {
 
       query += ' ORDER BY a.Date DESC';
 
+      console.log('Executing query:', query);
+      console.log('With params:', params);
+
       const [attendance] = await pool.query(query, params);
+      console.log('Found attendance records:', attendance.length);
+      
       res.json(attendance);
     } catch (error) {
+      console.error('Error in getEmployeeAttendance:', error);
       res.status(500).json({ message: 'Server error', error: error.message });
     }
   },
@@ -178,6 +188,59 @@ const attendanceController = {
       res.json(summary);
     } catch (error) {
       res.status(500).json({ message: 'Server error', error: error.message });
+    }
+  },
+
+  // Get today's attendance (admin only)
+  getTodayAttendance: async (req, res) => {
+    try {
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      console.log('Fetching attendance for date:', today);
+      
+      // First get all attendance records for today with employee details
+      const [attendance] = await pool.query(
+        `SELECT 
+          a.Attendance_ID,
+          a.Employee_ID,
+          e.First_Name,
+          e.Last_Name,
+          a.Date,
+          a.Hours_Worked,
+          a.Status,
+          a.Shift_Details
+         FROM Attendance a
+         JOIN Employee e ON e.Employee_ID = a.Employee_ID
+         WHERE DATE(a.Date) = ?
+         ORDER BY e.First_Name`,
+        [today]
+      );
+
+      // Get summary counts
+      const [summary] = await pool.query(
+        `SELECT 
+          COUNT(CASE WHEN Status = 'Present' THEN 1 END) as present_count,
+          COUNT(CASE WHEN Status = 'Absent' THEN 1 END) as absent_count,
+          COUNT(CASE WHEN Status = 'Half-Day' THEN 1 END) as half_day_count,
+          COUNT(CASE WHEN Status = 'Leave' THEN 1 END) as leave_count
+         FROM Attendance
+         WHERE DATE(Date) = ?`,
+        [today]
+      );
+
+      console.log('Attendance records found:', attendance.length);
+      console.log('Summary:', summary[0]);
+
+      res.json({
+        attendance,
+        summary: summary[0]
+      });
+    } catch (error) {
+      console.error('Error in getTodayAttendance:', error);
+      res.status(500).json({ 
+        message: 'Error fetching today\'s attendance',
+        error: error.message 
+      });
     }
   }
 };

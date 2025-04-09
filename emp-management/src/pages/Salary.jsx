@@ -347,10 +347,7 @@ const Salary = () => {
                           type="number"
                           name="basicSalary"
                           value={salaryDetails.basicSalary}
-                          onChange={(e) => setSalaryDetails(prev => ({
-                            ...prev,
-                            basicSalary: Number(e.target.value)
-                          }))}
+                          readOnly
                           className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
                         />
                       </div>
@@ -366,10 +363,7 @@ const Salary = () => {
                           type="number"
                           name="allowances"
                           value={salaryDetails.allowances}
-                          onChange={(e) => setSalaryDetails(prev => ({
-                            ...prev,
-                            allowances: Number(e.target.value)
-                          }))}
+                          readOnly
                           className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
                         />
                       </div>
@@ -402,10 +396,7 @@ const Salary = () => {
                           type="number"
                           name="bonus"
                           value={salaryDetails.bonus}
-                          onChange={(e) => setSalaryDetails(prev => ({
-                            ...prev,
-                            bonus: Number(e.target.value)
-                          }))}
+                          readOnly
                           className="focus:ring-indigo-500 focus:border-indigo-500 block w-full pl-7 pr-12 sm:text-sm border-gray-300 rounded-md"
                         />
                       </div>

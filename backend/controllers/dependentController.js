@@ -24,15 +24,37 @@ const dependentController = {
       const { employeeId } = req.params;
       const { Name, Relationship, DOB, Gender, Contact } = req.body;
 
-      // Validate required fields
-      if (!Name || !Relationship || !DOB || !Gender || !Contact) {
-        return res.status(400).json({ message: 'All fields are required' });
+      // Check if at least one field is provided
+      if (!Name && !Relationship && !DOB && !Gender && !Contact) {
+        return res.status(400).json({ message: 'At least one field must be provided' });
+      }
+
+      // Validate Name if provided
+      if (Name && Name.trim().length < 2) {
+        return res.status(400).json({ message: 'Name must be at least 2 characters long' });
+      }
+
+      // Validate Contact if provided
+      if (Contact && !/^\d{10}$/.test(Contact.trim())) {
+        return res.status(400).json({ message: 'Contact must be a valid 10-digit number' });
+      }
+
+      // Validate DOB if provided
+      if (DOB && new Date(DOB) > new Date()) {
+        return res.status(400).json({ message: 'Date of Birth cannot be in the future' });
       }
 
       const [result] = await pool.query(
         `INSERT INTO Dependent (Employee_ID, Name, Relationship, DOB, Gender, Contact)
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [employeeId, Name, Relationship, DOB, Gender, Contact]
+        [
+          employeeId,
+          Name?.trim() || null,
+          Relationship?.trim() || null,
+          DOB || null,
+          Gender || null,
+          Contact?.trim() || null
+        ]
       );
 
       res.status(201).json({

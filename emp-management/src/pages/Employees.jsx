@@ -200,27 +200,35 @@ const Employees = () => {
 
   const handleAddDependent = async (employeeId) => {
     try {
-      // Form validation
-      const formErrors = [];
-      if (!dependentForm.Name?.trim()) formErrors.push("Name is required");
-      if (!dependentForm.Relationship?.trim()) formErrors.push("Relationship is required");
-      if (!dependentForm.DOB) formErrors.push("Date of Birth is required");
-      if (!dependentForm.Gender) formErrors.push("Gender is required");
-      if (!dependentForm.Contact?.trim()) formErrors.push("Contact is required");
+      // Form validation - only validate if any field is filled
+      const hasAnyField = Object.values(dependentForm).some(value => value?.trim());
+      
+      if (hasAnyField) {
+        const formErrors = [];
+        if (dependentForm.Name?.trim() && dependentForm.Name.trim().length < 2) {
+          formErrors.push("Name must be at least 2 characters");
+        }
+        if (dependentForm.Contact?.trim() && !/^\d{10}$/.test(dependentForm.Contact.trim())) {
+          formErrors.push("Contact must be a valid 10-digit number");
+        }
+        if (dependentForm.DOB && new Date(dependentForm.DOB) > new Date()) {
+          formErrors.push("Date of Birth cannot be in the future");
+        }
 
-      if (formErrors.length > 0) {
-        setError(formErrors.join(", "));
-        return;
+        if (formErrors.length > 0) {
+          setError(formErrors.join(", "));
+          return;
+        }
       }
 
       const token = localStorage.getItem('token');
       const formattedData = {
         Employee_ID: employeeId,
-        Name: dependentForm.Name.trim(),
-        Relationship: dependentForm.Relationship.trim(),
-        DOB: new Date(dependentForm.DOB).toISOString().split('T')[0],
-        Gender: dependentForm.Gender,
-        Contact: dependentForm.Contact.trim()
+        Name: dependentForm.Name?.trim() || null,
+        Relationship: dependentForm.Relationship?.trim() || null,
+        DOB: dependentForm.DOB ? new Date(dependentForm.DOB).toISOString().split('T')[0] : null,
+        Gender: dependentForm.Gender || null,
+        Contact: dependentForm.Contact?.trim() || null
       };
 
       const response = await axios.post(
@@ -609,7 +617,6 @@ const Employees = () => {
                           value={dependentForm.Name || ''}
                           onChange={handleDependentChange}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          required
                           placeholder="Enter dependent's name"
                           minLength={2}
                         />
@@ -621,7 +628,6 @@ const Employees = () => {
                           value={dependentForm.Relationship || ''}
                           onChange={handleDependentChange}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          required
                         >
                           <option value="">Select Relationship</option>
                           <option value="Spouse">Spouse</option>
@@ -639,7 +645,6 @@ const Employees = () => {
                           value={dependentForm.DOB || ''}
                           onChange={handleDependentChange}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          required
                           max={new Date().toISOString().split('T')[0]}
                         />
                       </div>
@@ -650,7 +655,6 @@ const Employees = () => {
                           value={dependentForm.Gender || ''}
                           onChange={handleDependentChange}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          required
                         >
                           <option value="">Select Gender</option>
                           <option value="M">Male</option>
@@ -666,7 +670,6 @@ const Employees = () => {
                           value={dependentForm.Contact || ''}
                           onChange={handleDependentChange}
                           className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
-                          required
                           placeholder="Enter contact number"
                           pattern="[0-9]{10}"
                           title="Please enter a valid 10-digit contact number"
@@ -678,7 +681,6 @@ const Employees = () => {
                         type="button"
                         onClick={() => handleAddDependent(formData.Employee_ID)}
                         className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-                        disabled={!dependentForm.Name || !dependentForm.Relationship || !dependentForm.DOB || !dependentForm.Gender || !dependentForm.Contact}
                       >
                         Add Dependent
                       </button>

@@ -12,42 +12,13 @@ import EmployeeDashboard from './pages/EmployeeDashboard';
 import EmployeeProfile from './pages/EmployeeProfile';
 import EmployeeDependents from './pages/EmployeeDependents';
 import EmployeeLeave from './pages/EmployeeLeave';
+import EmployeeAttendance from './pages/EmployeeAttendance';
+import EmployeePayslip from './pages/EmployeePayslip';
 import EmployeeProtectedRoute from './components/EmployeeProtectedRoute';
 import EmployeeNavbar from './components/EmployeeNavbar';
 import EmployeeSidebar from './components/EmployeeSidebar';
 import Home from './pages/Home';
 import './App.css';
-
-// Placeholder components for employee pages
-const EmployeePayslip = () => (
-  <div className="flex h-screen bg-gray-50">
-    <EmployeeSidebar />
-    <div className="flex-1 ml-64">
-      <EmployeeNavbar />
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Payslip</h1>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <p className="text-gray-600">Payslip content will be displayed here.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const EmployeeAttendance = () => (
-  <div className="flex h-screen bg-gray-50">
-    <EmployeeSidebar />
-    <div className="flex-1 ml-64">
-      <EmployeeNavbar />
-      <div className="p-6">
-        <h1 className="text-2xl font-bold text-gray-800 mb-6">Attendance</h1>
-        <div className="bg-white rounded-lg shadow-md p-6">
-          <p className="text-gray-600">Attendance content will be displayed here.</p>
-        </div>
-      </div>
-    </div>
-  </div>
-);
 
 function App() {
   return (

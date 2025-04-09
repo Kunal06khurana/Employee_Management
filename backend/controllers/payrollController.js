@@ -245,6 +245,7 @@ const payrollController = {
     try {
       const { employeeId, month, year } = req.params;
 
+      // First try to get existing payslip
       const [[payslip]] = await pool.query(
         `SELECT p.*, e.First_Name, e.Last_Name, e.Department_ID,
                 d.Department_Name
@@ -257,11 +258,99 @@ const payrollController = {
         [employeeId, month, year]
       );
 
-      if (!payslip) {
-        return res.status(404).json({ message: 'Payslip not found for the specified month' });
+      if (payslip) {
+        return res.json(payslip);
       }
 
-      res.json(payslip);
+      // If no payslip exists, calculate salary for the requested month
+      // Get basic salary and employee details
+      const [[employee]] = await pool.query(
+        `SELECT e.*, e.Basic_Salary 
+         FROM Employee e
+         WHERE e.Employee_ID = ?`,
+        [employeeId]
+      );
+
+      if (!employee) {
+        return res.status(404).json({ message: 'Employee not found' });
+      }
+
+      // Get overtime hours and total hours worked
+      const [overtimeResult] = await pool.query(
+        `SELECT 
+           SUM(GREATEST(Hours_Worked - 8, 0)) as total_overtime,
+           SUM(Hours_Worked) as total_hours
+         FROM Attendance 
+         WHERE Employee_ID = ? 
+         AND MONTH(Date) = ? 
+         AND YEAR(Date) = ?`,
+        [employeeId, month, year]
+      );
+
+      // Get approved leaves
+      const [leaveResult] = await pool.query(
+        `SELECT COUNT(*) as approved_leaves
+         FROM \`Leave\`
+         WHERE Employee_ID = ? 
+         AND Status = 'Approved'
+         AND MONTH(Start_Date) = ?
+         AND YEAR(Start_Date) = ?`,
+        [employeeId, month, year]
+      );
+
+      // Get number of dependents for insurance calculation
+      const [dependentResult] = await pool.query(
+        `SELECT COUNT(*) as dependent_count
+         FROM Dependent
+         WHERE Employee_ID = ?`,
+        [employeeId]
+      );
+
+      const basicSalary = employee.Basic_Salary || 0;
+      const overtime = overtimeResult[0].total_overtime || 0;
+      const totalHours = overtimeResult[0].total_hours || 0;
+      const approvedLeaves = leaveResult[0].approved_leaves || 0;
+      const dependentCount = dependentResult[0].dependent_count || 0;
+
+      // Calculate components according to requirements
+      const tax = basicSalary * 0.1;
+      const allowances = basicSalary * 0.05; // 5% of basic salary
+      const bonus = basicSalary * 0.1; // 10% of basic salary
+      const leaveDeductions = approvedLeaves * 1000; // 1000 per leave
+      
+      // Calculate insurance: 1000*(1 + dependents + 100*(hours - 8))
+      const insurance = 1000 * (1 + dependentCount);
+      const overtimeHours = 100 * (overtime);
+
+      // Calculate net salary
+      const netSalary = (
+        basicSalary - 
+        tax + 
+        allowances - 
+        insurance + 
+        overtimeHours - 
+        leaveDeductions + 
+        bonus
+      );
+
+      // Create a payslip object with calculated values
+      const calculatedPayslip = {
+        Employee_ID: employeeId,
+        First_Name: employee.First_Name,
+        Last_Name: employee.Last_Name,
+        Department_ID: employee.Department_ID,
+        Basic_Salary: basicSalary,
+        Overtime_Hours: overtimeHours,
+        Bonus: bonus,
+        Tax: tax,
+        Insurance: insurance,
+        Leave_Deductions: leaveDeductions,
+        Net_Salary: netSalary,
+        Allowances: allowances,
+        Payment_Date: new Date(year, month - 1, 1).toISOString().split('T')[0]
+      };
+
+      res.json(calculatedPayslip);
     } catch (error) {
       console.error('Error in getPayslip:', error);
       res.status(500).json({ message: 'Failed to fetch payslip' });

@@ -44,13 +44,17 @@ const employeeRoutes = require('./routes/employeeRoutes');
 const departmentRoutes = require('./routes/departmentRoutes');
 const leaveRoutes = require('./routes/leaveRoutes');
 const payrollRoutes = require('./routes/payrollRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const employeePayrollRoutes = require('./routes/employeePayrollRoutes');
 
 console.log('Routes loaded:', {
   auth: !!authRoutes,
   leave: !!leaveRoutes,
   employees: !!employeeRoutes,
   departments: !!departmentRoutes,
-  payroll: !!payrollRoutes
+  payroll: !!payrollRoutes,
+  attendance: !!attendanceRoutes,
+  employeePayroll: !!employeePayrollRoutes
 });
 
 // Mount routes with debugging
@@ -78,6 +82,15 @@ app.use('/api/payroll', (req, res, next) => {
   console.log('Payroll route accessed');
   next();
 }, payrollRoutes);
+
+// Employee routes
+app.use('/api/employee/payroll', employeePayrollRoutes);
+
+// Attendance routes with logging
+app.use('/api/attendance', (req, res, next) => {
+  console.log('Attendance route accessed');
+  next();
+}, attendanceRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -116,5 +129,6 @@ app.listen(PORT, () => {
   console.log(`Port: ${PORT}`);
   console.log('Test endpoint:', `http://localhost:${PORT}/api/test`);
   console.log('Departments endpoint:', `http://localhost:${PORT}/api/departments`);
+  console.log('Attendance endpoint:', `http://localhost:${PORT}/api/attendance`);
   console.log('===================\n');
 }); 
