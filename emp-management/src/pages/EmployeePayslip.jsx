@@ -23,6 +23,16 @@ const EmployeePayslip = () => {
     netSalary: 0,
     allowances: 0,
   })
+  
+  const [employeeDetails, setEmployeeDetails] = useState({
+    firstName: "",
+    lastName: "",
+    employeeId: "",
+    departmentId: "",
+    departmentName: "",
+    position: "Employee"
+  })
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1)
@@ -37,21 +47,68 @@ const EmployeePayslip = () => {
     try {
       const employeeUser = JSON.parse(localStorage.getItem("employeeUser") || "{}")
       const employeeId = employeeUser.id
+      const employeeToken = localStorage.getItem("employeeToken")
 
-      if (!employeeId) {
+      if (!employeeId || !employeeToken) {
         setError("Employee ID not found. Please log in again.")
         setLoading(false)
         return
       }
 
+      // First, get employee details from the employee profile API
+      try {
+        const profileResponse = await axios.get(
+          `http://localhost:5000/api/employee/profile`,
+          {
+            headers: { Authorization: `Bearer ${employeeToken}` },
+          }
+        )
+        
+        const profileData = profileResponse.data
+        
+        setEmployeeDetails({
+          firstName: profileData.First_Name || "",
+          lastName: profileData.Last_Name || "",
+          employeeId: profileData.Employee_ID || employeeId,
+          departmentId: profileData.Department_ID || "",
+          departmentName: profileData.Department_Name || profileData.Department_ID || "",
+          position: profileData.Position || "Employee"
+        })
+      } catch (profileErr) {
+        console.error("Error fetching profile data:", profileErr)
+        // If profile fetch fails, use data from localStorage as fallback
+        setEmployeeDetails({
+          firstName: employeeUser.First_Name || "",
+          lastName: employeeUser.Last_Name || "",
+          employeeId: employeeUser.id || "",
+          departmentId: employeeUser.Department_ID || "",
+          departmentName: employeeUser.Department_Name || employeeUser.Department_ID || "",
+          position: employeeUser.Position || "Employee"
+        })
+      }
+
+      // Get payslip data
       const response = await axios.get(
         `http://localhost:5000/api/employee/payroll/payslip/${selectedMonth}/${selectedYear}`,
         {
-          headers: { Authorization: `Bearer ${localStorage.getItem("employeeToken")}` },
-        },
+          headers: { Authorization: `Bearer ${employeeToken}` },
+        }
       )
 
       const payslipData = response.data
+      
+      // Store employee details from payslip if available
+      if (payslipData.First_Name && payslipData.Last_Name) {
+        setEmployeeDetails(prev => ({
+          ...prev,
+          firstName: payslipData.First_Name,
+          lastName: payslipData.Last_Name,
+          employeeId: payslipData.Employee_ID || prev.employeeId,
+          departmentId: payslipData.Department_ID || prev.departmentId,
+          departmentName: payslipData.Department_Name || payslipData.Department_ID || prev.departmentName
+        }))
+      }
+      
       setSalaryDetails({
         basicSalary: Number(payslipData.Basic_Salary) || 0,
         overtimeHours: Number(payslipData.Overtime_Hours) || 0,
@@ -77,8 +134,6 @@ const EmployeePayslip = () => {
       setIsGenerating(true)
       const doc = new jsPDF()
       doc.autoTable = autoTable
-
-      const employeeUser = JSON.parse(localStorage.getItem("employeeUser") || "{}")
       
       // Add IIITA logo
       try {
@@ -116,11 +171,11 @@ const EmployeePayslip = () => {
       doc.setLineWidth(0.5)
       doc.line(20, 95, 190, 95)
 
-      // Employee information with cleaner layout
-      doc.text(`Name: ${employeeUser.First_Name || ""} ${employeeUser.Last_Name || ""}`, 20, 105)
-      doc.text(`Employee ID: ${employeeUser.id || ""}`, 20, 115)
-      doc.text(`Department: ${employeeUser.Department_ID || ""}`, 20, 125)
-      doc.text(`Position: ${employeeUser.Position || "Employee"}`, 120, 105)
+      // Employee information with cleaner layout - using updated employeeDetails state
+      doc.text(`Name: ${employeeDetails.firstName} ${employeeDetails.lastName}`, 20, 105)
+      doc.text(`Employee ID: ${employeeDetails.employeeId}`, 20, 115)
+      doc.text(`Department: ${employeeDetails.departmentName}`, 20, 125)
+      doc.text(`Position: ${employeeDetails.position}`, 120, 105)
       doc.text(`Pay Date: ${new Date().toLocaleDateString()}`, 120, 115)
       
       // Calculate totals
@@ -273,7 +328,7 @@ const EmployeePayslip = () => {
       }
 
       // Save PDF
-      doc.save(`IIITA_payslip_${employeeUser.id}_${selectedYear}_${selectedMonth}.pdf`)
+      doc.save(`IIITA_payslip_${employeeDetails.employeeId}_${selectedYear}_${selectedMonth}.pdf`)
       setTimeout(() => setIsGenerating(false), 1000)
     } catch (err) {
       setError("Failed to generate payslip")

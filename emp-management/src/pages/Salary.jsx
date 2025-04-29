@@ -730,7 +730,7 @@ const Salary = () => {
                     <h4 className="font-medium text-gray-700">Net Salary</h4>
                     <p className="text-sm text-gray-500">Total after deductions</p>
                   </div>
-                  <div className="text-3xl font-bold text-purple-600">${(salaryDetails.netSalary || 0).toFixed(2)}</div>
+                  <div className="text-3xl font-bold text-purple-600">${(Number(salaryDetails.netSalary) || 0).toFixed(2)}</div>
                 </div>
               </motion.div>
 
