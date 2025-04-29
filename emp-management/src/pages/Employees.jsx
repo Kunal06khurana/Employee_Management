@@ -5,6 +5,13 @@ import { Plus, Search, Edit, Trash2, Eye, Filter } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import axios from "axios"
 
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate()
+  ).padStart(2, '0')}`;
+};
+
 const Employees = () => {
   const navigate = useNavigate()
   const [searchTerm, setSearchTerm] = useState("")
@@ -139,7 +146,7 @@ const Employees = () => {
     // Format dates to YYYY-MM-DD for input fields
     const formattedEmployee = {
       ...employee,
-      Date_Joined: new Date(employee.Date_Joined).toISOString().split('T')[0],
+      Date_Joined: formatDate(employee.Date_Joined),
       DOB: new Date(employee.DOB).toISOString().split('T')[0],
       Basic_Salary: employee.Basic_Salary || '',
       Leave_Balance: employee.Leave_Balance || '',
@@ -296,13 +303,6 @@ const Employees = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-800 mb-2 md:mb-0">Employee Management</h1>
         <div className="flex space-x-2">
-          <button
-            onClick={() => setShowFilterModal(true)}
-            className="bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-md border border-gray-300 flex items-center"
-          >
-            <Filter className="w-5 h-5 mr-2" />
-            Filters
-          </button>
           <button
             onClick={() => navigate('/employees/add')}
             className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2 px-4 rounded-md flex items-center"

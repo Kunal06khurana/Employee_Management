@@ -177,26 +177,33 @@ const payrollController = {
         Bonus,
         Net_Salary,
         Taxable_Income,
-        Payment_Date
+        Payment_Date,
+        insurance  // Accept lowercase 'insurance' from frontend
       } = req.body;
 
-      // Get number of dependents for insurance calculation
-      const [dependentResult] = await pool.query(
-        `SELECT COUNT(*) as dependent_count
-         FROM Dependent
-         WHERE Employee_ID = ?`,
-        [employeeId]
-      );
+      // Use the insurance from request body if available, otherwise calculate it
+      let insuranceValue = insurance;
+      
+      // If insurance not provided in request, calculate based on dependents
+      if (insuranceValue === undefined || insuranceValue === null) {
+        // Get number of dependents for insurance calculation
+        const [dependentResult] = await pool.query(
+          `SELECT COUNT(*) as dependent_count
+           FROM Dependent
+           WHERE Employee_ID = ?`,
+          [employeeId]
+        );
 
-      const dependentCount = dependentResult[0].dependent_count || 0;
-      const Insurance = 1000 * (1 + dependentCount); // Base insurance + 1000 per dependent
+        const dependentCount = dependentResult[0].dependent_count || 0;
+        insuranceValue = 1000 * (1 + dependentCount); // Base insurance + 1000 per dependent
+      }
 
       console.log('Creating/updating payroll record:', {
         employeeId,
         Basic_Salary,
         Overtime_Hours,
         Bonus,
-        Insurance,
+        insurance: insuranceValue,
         Net_Salary,
         Taxable_Income,
         Payment_Date
@@ -209,27 +216,27 @@ const payrollController = {
       );
 
       if (existingPayroll.length > 0) {
-        // Update existing record
+        // Update existing record with lowercase 'insurance' field
         await pool.query(
           `UPDATE Payroll 
            SET Basic_Salary = ?,
                Overtime_Hours = ?,
                Bonus = ?,
-               Insurance = ?,
+               insurance = ?,
                Net_Salary = ?,
                Taxable_Income = ?,
                Payment_Date = ?
            WHERE Employee_ID = ?`,
-          [Basic_Salary, Overtime_Hours, Bonus, Insurance, Net_Salary, Taxable_Income, Payment_Date, employeeId]
+          [Basic_Salary, Overtime_Hours, Bonus, insuranceValue, Net_Salary, Taxable_Income, Payment_Date, employeeId]
         );
       } else {
-        // Create new record
+        // Create new record with lowercase 'insurance' field
         await pool.query(
           `INSERT INTO Payroll (
             Employee_ID, Basic_Salary, Overtime_Hours, Bonus, 
-            Insurance, Net_Salary, Taxable_Income, Payment_Date
+            insurance, Net_Salary, Taxable_Income, Payment_Date
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [employeeId, Basic_Salary, Overtime_Hours, Bonus, Insurance, Net_Salary, Taxable_Income, Payment_Date]
+          [employeeId, Basic_Salary, Overtime_Hours, Bonus, insuranceValue, Net_Salary, Taxable_Income, Payment_Date]
         );
       }
 
@@ -406,4 +413,4 @@ const payrollController = {
   }
 };
 
-module.exports = payrollController; 
+module.exports = payrollController;
